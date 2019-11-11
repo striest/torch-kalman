@@ -33,8 +33,6 @@ class KalmanFilter():
 		state_acc = [s]
 
 		#I think you can assume inital variance is 0.
-		p_cov = torch.zeros(n_trajs, self.state_dim, self.state_dim)
-		obs_cov = torch.zeros(n_trajs, self.obs_dim, self.obs_dim)
 
 		P = self.process_cov.repeat(n_trajs, 1, 1)
 		Q = self.obs_cov.repeat(n_trajs, 1, 1)
@@ -47,9 +45,9 @@ class KalmanFilter():
 
 			u = control[:, t, :]
 
-			F = self.transition_m_f(s)
-			B = self.control_m_f(s)
-			H = self.obs_m_f(s)
+			F = self.transition_m_f(s, u)
+			B = self.control_m_f(s, u)
+			H = self.obs_m_f(s, u)
 
 			print('F = {}'.format(F))
 			print('B = {}'.format(B))
@@ -145,10 +143,11 @@ def generate_noisy_trajectories(n_trajs, n_steps, lambda_acc, process_std, obs_s
 if __name__ == '__main__':
 	n_trajs = 1
 	n_steps = 50
-	acc = lambda t:0.2*t
+	acc = lambda t:min(max((t-15.) * 0.05, 0.), 1.)
 	dt = 0.1
-	process_std = 0.5
-	obs_std = 0.5
+
+	process_std = 0.001
+	obs_std = 0.01
 
 	true_trajs, trajs = generate_noisy_trajectories(n_trajs, n_steps, acc, process_std, obs_std, dt)
 	control = true_trajs[:, :, 2].unsqueeze(2)
@@ -160,7 +159,8 @@ if __name__ == '__main__':
 	gen = XVAAccControlMatrixGen(dt)
 
 	process_cov = torch.diag(torch.tensor([0.5*(dt**2), dt, process_std]))
-	obs_cov = torch.diag(torch.tensor([obs_std]*3))
+	process_cov = torch.diag(torch.tensor([process_std]*3))
+	obs_cov = torch.diag(torch.tensor([obs_std*100, obs_std*10, obs_std])) * 10
 
 	kf = KalmanFilter(3, 3, gen.build_F, gen.build_B, gen.build_H, process_cov, obs_cov)
 
@@ -180,9 +180,9 @@ if __name__ == '__main__':
 	ax[1, 0].scatter(t, v, s=0.5)
 	ax[2, 0].scatter(t, a, s=0.5)
 
-	ax[0, 1].scatter(t, xs, s=0.5)
-	ax[1, 1].scatter(t, xv, s=0.5)
-	ax[2, 1].scatter(t, xa, s=0.5)
+	ax[0, 1].scatter(t, xs, s=0.5, c='r')
+	ax[1, 1].scatter(t, xv, s=0.5, c='r')
+	ax[2, 1].scatter(t, xa, s=0.5, c='r')
 
 	plt.show()
 
